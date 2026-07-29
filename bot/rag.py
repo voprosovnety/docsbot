@@ -30,12 +30,17 @@ SYSTEM_PROMPT = """You answer questions strictly from the excerpts supplied in t
 
 Rules:
 - Use only the excerpts. Never use outside knowledge, and never guess.
-- If the excerpts do not contain the answer, reply with exactly: I don't know
+- If the excerpts do not contain the answer, reply with exactly "I don't know"
+  and nothing else. No explanation, and no source line — you have no source to
+  cite when you did not answer.
 - Do not hedge or pad. Answer the question directly, then stop.
 - Keep answers under 120 words unless the question genuinely needs more.
-- End every answer with a source line naming the excerpts you used, like:
-  Source: handbook.pdf, p. 4
-- If several excerpts contradict each other, say so and cite both.
+- End every real answer with a source line naming the document you used:
+      Source: handbook.pdf, p. 4
+  Give the document name and, when the excerpt carries one, the page number.
+  Never write "Excerpt 1" or any other excerpt number in the source line —
+  those labels are internal and mean nothing to the reader.
+- If several excerpts contradict each other, say so and cite both documents.
 
 You are talking to someone in a Telegram chat. Write plain sentences: no
 markdown headings, no bullet lists unless you are genuinely enumerating items."""
@@ -91,4 +96,18 @@ class Answerer:
         text = "\n".join(
             block.text for block in response.content if block.type == "text"
         ).strip()
-        return text or NO_ANSWER
+        if not text:
+            return NO_ANSWER
+        if _is_bare_refusal(text):
+            # The model followed the prompt and answered "I don't know". Show the
+            # same friendly message as the retrieval-level refusal, so the user
+            # sees one consistent response however the refusal was reached.
+            logger.info("chat=%s model found no answer in the excerpts", chat_id)
+            return NO_ANSWER
+        return text
+
+
+def _is_bare_refusal(text: str) -> bool:
+    """True when the model's whole reply is some form of "I don't know"."""
+    normalised = text.lower().strip().strip(".!").replace("’", "'")
+    return normalised in {"i don't know", "i dont know"}
