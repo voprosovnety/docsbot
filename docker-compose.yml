@@ -12,6 +12,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    # Without this the bot comes back after a host reboot but the database
+    # doesn't, and the bot fails on startup.
+    restart: unless-stopped
 
   bot:
     build: .
