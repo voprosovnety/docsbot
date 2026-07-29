@@ -1,0 +1,30 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-docsbot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-docsbot}
+      POSTGRES_DB: ${POSTGRES_DB:-docsbot}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-docsbot}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  bot:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-docsbot}:${POSTGRES_PASSWORD:-docsbot}@postgres:5432/${POSTGRES_DB:-docsbot}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - models:/app/models
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  models:
